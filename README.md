@@ -57,8 +57,6 @@ You will need to provide:
 - Default output format (e.g., json)
 
 ## 4. Bootstrap the AWS CDK (If Required)
-## 4. Bootstrap the AWS CDK (If Required)
-
 Before bootstrapping, **make sure to edit the environment file (`environment.yml`) with the correct values for your deployment**. 
 This is crucial to ensure that your deployment uses the appropriate configurations for your environment.
 
