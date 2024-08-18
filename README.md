@@ -31,8 +31,8 @@ Before you begin, ensure you have the following installed:
 First, clone the repository to your local machine:
 
 ```bash
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/Masahiro-wa/dev-env.git
+cd dev-env
 ```
 
 ## 2. Install Dependencies
