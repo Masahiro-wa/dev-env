@@ -80,7 +80,7 @@ If you want to review the CloudFormation template before deploying, you can synt
 cdk synth
 ```
 ### SSH KEY
-To create the SSH private key file, please run the command found in the "Getmwdevkeypair" output of the EC2 stack. This will generate the private key file in your local directory. Please be cautious not to overwrite any existing files.
+To create the SSH private key file, please run the command found in the "Getxxxkeypair" output of the EC2 stack.(xxx is your env name) This will generate the private key file in your local directory. Please be cautious not to overwrite any existing files.
 
 ### EC2 Startup 
 Even after the EC2 deployment is complete, initial processes may still be running internally. Ideally, it is recommended to wait 5 to 7 minutes after the deployment completes. If the commands `python -V` or `docker --help` are not found, it may indicate that the initial processes are still running. In that case, please wait a bit longer. You can also check the progress by reviewing the `/var/log/cloud-init-xxx.log` file.
