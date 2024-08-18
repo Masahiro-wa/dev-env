@@ -24,7 +24,6 @@ export class LambdaStack extends cdk.Stack {
         const accountId = this.account;
         const instanceId = props.instance.instanceId;
         const bucket = props_s3.configS3Bucket;
-        const lambdaPath = path.join(__dirname,'..','src','lambda','stop_ec2');
         const stopCron = envs.get('STOP_CRON'); // "0,14, ?, *, SUN-THU, *" のような形式で指定
         const startCron = envs.get('START_CRON'); // "0,6, *, *, MON-FRI, *" のような形式で指定
 
