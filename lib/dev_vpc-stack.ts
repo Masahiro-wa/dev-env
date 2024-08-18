@@ -2,9 +2,8 @@ import { Aspects, Stack, StackProps, Tag, Tags } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CfnInternetGateway,CfnNatGateway ,CfnEIP,CfnRoute, CfnRouteTable, CfnSubnet, CfnSubnetRouteTableAssociation, CfnVPCGatewayAttachment, PrivateSubnet, PrivateSubnetProps, PublicSubnet, SubnetType, Vpc } from 'aws-cdk-lib/aws-ec2';
 
-interface VpcStackProps extends StackProps {
+interface VpcStackProps extends StackProps {}
 
-}
 export class VpcStack extends Stack {
   public readonly publicSubnet: CfnSubnet;
   public readonly privateSubnetA: CfnSubnet;

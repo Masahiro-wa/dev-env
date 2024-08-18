@@ -1,4 +1,5 @@
 import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as fs from 'fs';
@@ -9,33 +10,26 @@ interface VpcStackProps extends cdk.StackProps {
     publicSubnet: ec2.CfnSubnet;
     privateSubnetA: ec2.CfnSubnet;
     vpc: ec2.Vpc;
+};
+
+interface S3StackProps extends cdk.StackProps {
+  configS3bucket: s3.Bucket;
 }
 
 export class Ec2Stack extends cdk.Stack {
     readonly instance: ec2.Instance;
 
-    constructor(scope: Construct, id: string, props: VpcStackProps){
+    constructor(scope: Construct, id: string, props: VpcStackProps, props_s3: S3StackProps){
         super(scope, id, props);
         const projName = "seminer";
         const envName = "dev";
         const vpc = props.vpc;
         const accountId = this.account;
-        //const filePath = './lib/startup.sh'
-        //const fileStream = fs.createReadStream(filePath);
-        //const rl = readline.createInterface({
-        //    input: fileStream,
-        //    crlfDelay: Infinity
-        //});
-
-        //const bastionUserData = ec2.UserData.forLinux({ shebang: "#!/bin/bash" });
-
-        //rl.on('line', (line) => {
-        //    bastionUserData.addCommands(line);
-        //});
 
         const instancerole = new iam.Role(this , `${projName}-${envName}-instance-role`, {
             assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
         });
+
         instancerole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore"));
         //S3へのアクセス権限を追加
         instancerole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3ReadOnlyAccess"));
@@ -43,42 +37,10 @@ export class Ec2Stack extends cdk.Stack {
         instancerole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonEC2ContainerRegistryPowerUser"));
         //S3へのアクセス権限を追加
         instancerole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess"));
-
-        const eksAdminPolicy = new iam.ManagedPolicy(this, 'EksAdminPolicy', {
-            statements: [
-                new iam.PolicyStatement({
-                effect: iam.Effect.ALLOW,
-                actions: [
-                    "eks:*",
-                ],
-                resources: ["*"],
-                }),
-            ],
-            });
-        const eksEbsCsiDriverPolicy = new iam.ManagedPolicy(this, 'EksEbsCsiDriverPolicy', {
-            statements: [
-                new iam.PolicyStatement({
-                effect: iam.Effect.ALLOW,
-                actions: [
-                    "iam:PassRole",
-                    "iam:DeleteRole",
-                    "iam:CreateRole",
-                    "iam:AttachRolePolicy",
-                    "iam:DetachRolePolicy",
-                    "iam:FullAccess"
-                ],
-                resources: [`arn:aws:iam::${accountId}:role/AmazonEKS_EBS_CSI_DriverRole`],
-                }),
-            ],
-            });
-
-        instancerole.addManagedPolicy(eksAdminPolicy);
-        instancerole.addManagedPolicy(eksEbsCsiDriverPolicy);
         //roleをリストするための権限を追加
         instancerole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("IAMReadOnlyAccess"));
         //cloudformation:CreateStackの権限を追加
         instancerole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AWSCloudFormationFullAccess"));
-
 
         const sshKeyPair = new ec2.CfnKeyPair(this, `${projName}-${envName}-keypair`, {
             keyName: `${projName}-${envName}-keypair`,
@@ -101,9 +63,6 @@ export class Ec2Stack extends cdk.Stack {
             ec2.Port.tcp(22),
             "allow ssh access from mypc"
             );
-
-
-
         const publicSubnet = ec2.Subnet.fromSubnetAttributes(this, `PublicSubnet`, {
             subnetId: props.publicSubnet.attrSubnetId,
             availabilityZone: props.publicSubnet.availabilityZone
@@ -135,6 +94,14 @@ export class Ec2Stack extends cdk.Stack {
             });
             return instance;
         }
+        /*
+        ec2Instance.addUserData(
+          `#!/bin/bash`,
+          `aws s3 cp s3://${bucketName}/${scriptKey} /tmp/${scriptKey}`,
+          `chmod +x /tmp/${scriptKey}`,
+          `/tmp/${scriptKey}`
+        );
+        */
 
         const pubInstance_1 = createInstance(`${projName}-${envName}-instance`, `${projName}-${envName}-instance`, publicSubnet);
         //const manageInstance = createInstance(`${projName}-${envName}-instance`, `${projName}-${envName}-instance`, privateSubnet);
