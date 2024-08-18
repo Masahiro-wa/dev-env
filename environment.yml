@@ -1,2 +1,22 @@
-PROJECT_NAME: "dev-env"
-ENV_NAME: "dev"
+DEPLOY_REGION: "ap-northeast-1"
+ENV_NAME: ""
+VPC_CIDR: "10.1.0.0/16"
+PUB_SUBNET_CIDR: 
+  - az: "ap-northeast-1a"
+    cidr: "10.1.0.0/26"
+
+#ここをyesにするとNATGatewayも作成されるので料金に注意
+CREATE_PRIV_SUBNET: "yes"
+PRIV_SUBNET_CIDR:
+  - az: "ap-northeast-1a"
+    cidr: "10.1.1.0/26" 
+
+SG_RULES:
+  - port: "22"
+    cidr: "x.x.x.x/xx"
+  - port: "80"
+    cidr: "x.x.x.x/xx"
+IS_MANAGED_AMI: "yes"
+INSTANCE_TYPE: "t3.medium"
+STOP_CRON: "cron(0 11 ? * * *)"
+START_CRON: "cron(0 6 ? * MON-FRI *)"

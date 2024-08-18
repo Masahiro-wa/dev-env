@@ -13,104 +13,113 @@ export class S3Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
     const env_name = envs.get('ENV_NAME');
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}` +
-                      `${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}` +
-                      `${String(now.getMinutes()).padStart(2, '0')}`;
 
     // S3バケットの作成
-    const bucket = new s3.Bucket(this, `${env_name}.config.${timestamp}`, {
+    const bucket = new s3.Bucket(this, `${env_name}.config`, {
       versioned: true,
-    });
+    });    
+    /* 都度ディレクトリーごと作成したかったが、cdk ls でエラーが出るため、一旦コメントアウト
+    if (!fs.existsSync(zipDir)) {
+        try {
+            fs.mkdirSync(zipDir, { mode: 0o777 });
+            console.log(`ディレクトリが作成されました: ${zipDir}`);
+        } catch (error) {
+            console.error(`ディレクトリの作成に失敗しました: ${zipDir}`, error);
+            throw error;
+        }
+    } else {
+        console.log(`ディレクトリは既に存在します: ${zipDir}`);
+    }
+    */
 
-    // 一時的な/tmpディレクトリを作成
-    const tmpDir = path.join(__dirname, '../src/tmp');
-    if (!fs.existsSync(tmpDir)) {
-        fs.mkdirSync(tmpDir, { mode: 0o777 }); // 0o777は完全な読み書き実行権限
-        console.log(`ディレクトリが作成されました: ${tmpDir}`);
-    };
-
-    // /src/配下の各ディレクトリを検出
+    // lambda 関数をzip化してS3にアップロード処理
+    const zipDir = path.join(__dirname, '../src/tmp');
     const lambdaRootDir = path.join(__dirname, '../src/lambda');
-    const ec2RootDir = path.join(__dirname, '../src/ec2/dev');
-
     const directories = fs.readdirSync(lambdaRootDir).filter(file => {
       return fs.statSync(path.join(lambdaRootDir, file)).isDirectory();
     });
-
     // 各ディレクトリに対してZIPを作成し、S3にアップロード
     directories.forEach(async (dir) => {
       const sourceDir = path.join(lambdaRootDir, dir);
-      const zipFilePath = path.join(tmpDir, `${dir}.zip`);
-
+      const zipFilePath = path.join(zipDir, `${dir}.zip`);
       // ZIPファイルの作成が完了するまで待機
       await this.createZipFile(sourceDir, zipFilePath);
 
       if (!fs.existsSync(zipFilePath)) {
         throw new Error(`ZIPファイルが見つかりません: ${zipFilePath}`);
       }
-
-      new s3deploy.BucketDeployment(this, `DeployLambdaZip-${dir}`, {
-        sources: [s3deploy.Source.asset(zipFilePath)],
-        destinationBucket: bucket,
-        destinationKeyPrefix: `lambda/${dir}/`, // 各関数ごとに異なるS3パス
-      });
-
-      // ZIPファイルを削除
-      fs.removeSync(zipFilePath);
     });
 
-    // 処理終了後に/tmpディレクトリを削除
-    fs.removeSync(tmpDir);
+    new s3deploy.BucketDeployment(this, `DeployLambdaZip`, {
+      sources: [s3deploy.Source.asset(zipDir)],
+      destinationBucket: bucket,
+      destinationKeyPrefix: `lambda/`
+    });
 
-    new s3deploy.BucketDeployment(this, `DeployEc2Configs`, {
+
+    // ec2関連のディレクトリをそのままS3にアップロード
+    const ec2RootDir = path.join(__dirname, '../src/ec2');
+    new s3deploy.BucketDeployment(this, 'DeployEc2Files', {
         sources: [s3deploy.Source.asset(ec2RootDir)],
         destinationBucket: bucket,
-        destinationKeyPrefix: `ec2/dev/`, // 各関数ごとに異なるS3パス
+        destinationKeyPrefix: 'ec2/', // S3でのディレクトリパスを指定
       });
 
     this.bucket = bucket;
+    // ZIPファイルを削除. 
+    // この処理は必須ではないが、ディスクスペースを節約するために削除する.
+    // なんか消えなくなったのでコメントアウトする.
+    //directories.forEach( (dir) => {
+    //  const zipFilePath = path.join(zipDir, `${dir}.zip`);
+    //  fs.removeSync(zipFilePath);
+    //});
   }
+
+  
 
   // ZIPファイルを作成するメソッド
   private createZipFile(sourceDir: string, outputFilePath: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const output = fs.createWriteStream(outputFilePath);
-      const archive = archiver('zip', {
-        zlib: { level: 9 } // 圧縮レベルを設定
-      });
+        const output = fs.createWriteStream(outputFilePath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
 
-      output.on('close', () => {
-        console.log(`ZIPファイルが作成されました: ${archive.pointer()} total bytes`);
-        resolve();
-      });
+        console.log(`Creating ZIP file: ${outputFilePath} from source: ${sourceDir}`);
 
-      archive.on('warning', (err) => {
-        if (err.code === 'ENOENT') {
-          console.warn('Warning:', err.message);
-          resolve(); // 警告であれば処理を続行
+        output.on('close', () => {
+            console.log(`ZIPファイルが作成されました: ${archive.pointer()} total bytes`);
+            resolve();
+        });
+
+        archive.on('warning', (err) => {
+            if (err.code === 'ENOENT') {
+                console.warn('Warning:', err.message);
+                resolve(); // 警告であれば処理を続行
+            } else {
+                reject(err); // エラーが発生した場合はreject
+            }
+        });
+
+        archive.on('error', (err) => {
+            console.error('Error:', err.message);
+            reject(err);
+        });
+
+        archive.pipe(output);
+
+        if (fs.existsSync(sourceDir)) {
+            console.log(`Source directory exists: ${sourceDir}`);
+            archive.directory(sourceDir, false);
         } else {
-          reject(err); // エラーが発生した場合はreject
+            console.error(`Source directory does not exist: ${sourceDir}`);
+            reject(new Error(`Source directory does not exist: ${sourceDir}`));
         }
-      });
 
-      archive.on('error', (err) => {
-        console.error('Error:', err.message);
-        reject(err);
-      });
-
-      archive.pipe(output);
-
-      // ディレクトリ全体をZIPに追加
-      archive.directory(sourceDir, false);
-
-      // ZIPファイルの最終化
-      archive.finalize().then(() => {
-        console.log('ZIPファイルの作成が完了しました。');
-      }).catch(err => {
-        console.error('ZIPファイルの作成中にエラーが発生しました:', err.message);
-        reject(err);
-      });
+        archive.finalize().then(() => {
+            console.log('ZIPファイルの作成が完了しました。');
+        }).catch(err => {
+            console.error('ZIPファイルの作成中にエラーが発生しました:', err.message);
+            reject(err);
+        });
     });
-  }
+  };
 }
