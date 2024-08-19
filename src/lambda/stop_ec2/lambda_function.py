@@ -7,13 +7,14 @@ def lambda_handler(event, context):
     instance_id = os.environ['INSTANCE_ID']
     ec2 = boto3.client('ec2')
 
-    action = event['action']
+    action = event.get('action')
     response = {}
+    
     if action == 'stop':
-        response = ec2.stop_ec2(InstanceIds=[instance_id])
+        response = ec2.stop_instances(InstanceIds=[instance_id])
         log.info(f'EC2 instance stopped: {response}')
     elif action == 'start':
-        response = ec2.start_ec2(InstanceIds=[instance_id])
+        response = ec2.start_instances(InstanceIds=[instance_id])
         log.info(f'EC2 instance started: {response}')
     else:    
         response = {'message':'Invalid action'}

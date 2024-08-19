@@ -6,7 +6,6 @@ import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as s3 from "aws-cdk-lib/aws-s3"; // Add this line
 import { Construct } from "constructs"; 
-import * as path from 'path';
 import { envs } from '../utils/envs';
 
 interface DevEc2StackProps extends cdk.StackProps {
@@ -46,6 +45,7 @@ export class LambdaStack extends cdk.Stack {
             runtime: lambda.Runtime.PYTHON_3_12,
             handler: 'lambda_function.lambda_handler',
             code: lambda.Code.fromBucket(bucket, 'lambda/stop_ec2.zip'),
+            timeout: cdk.Duration.seconds(60),
             role: lambdaRole,
             environment: {
                 INSTANCE_ID: instanceId
@@ -56,12 +56,16 @@ export class LambdaStack extends cdk.Stack {
         const stopEvent = new events.Rule(this, `lambda-stop-event`, {
             schedule: events.Schedule.expression(stopCron),
         });
-        stopEvent.addTarget(new targets.LambdaFunction(ec2ControlLambda));
+        stopEvent.addTarget(new targets.LambdaFunction(ec2ControlLambda, {
+            event: events.RuleTargetInput.fromObject({ action: 'stop' })
+        }));
 
         // 開始用のイベントルール
         const startEvent = new events.Rule(this, `lambda-start-event`, {
             schedule: events.Schedule.expression(startCron),
         });
-        startEvent.addTarget(new targets.LambdaFunction(ec2ControlLambda));
+        startEvent.addTarget(new targets.LambdaFunction(ec2ControlLambda, {
+            event: events.RuleTargetInput.fromObject({ action: 'start' })
+        }));
     }
 }

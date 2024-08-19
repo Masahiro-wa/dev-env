@@ -16,7 +16,12 @@ SG_RULES:
     cidr: "x.x.x.x/xx"
   - port: "80"
     cidr: "x.x.x.x/xx"
+
 IS_MANAGED_AMI: "yes"
+CUSTOM_AMI: 
+  - region: "ap-northeast-1"
+    id: "ami-xxxxxxxxxxxxxxxxx"
 INSTANCE_TYPE: "t3.medium"
+
 STOP_CRON: "cron(0 11 ? * * *)"
 START_CRON: "cron(0 6 ? * MON-FRI *)"
